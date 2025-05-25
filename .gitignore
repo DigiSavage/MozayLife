@@ -1,0 +1,17 @@
+# no .pyc files
+*.pyc
+# ignore images folder
+images
+*.jpg
+# ignore mac files
+.DS_Store
+# ignore temporary files
+*~
+# ignore build folder
+build/
+# ignore .so libraries
+/mosaic/media/
+/photomosaic_exec/venv/
+venv/
+venv/
+.env

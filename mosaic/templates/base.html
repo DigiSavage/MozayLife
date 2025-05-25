@@ -1,0 +1,42 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Photomosaic{% endblock %}</title>
+  <meta name="description" content="Photomosaic file upload, gallery, and mosaic creation.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Bootstrap 3 CSS -->
+  <link
+    rel="stylesheet"
+    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+  />
+
+  <!-- Your custom CSS -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="container">
+    <nav class="navbar navbar-default">
+      <ul class="nav navbar-nav">
+        <li><a href="{% url 'home' %}">Create Mosaic</a></li>
+        <li><a href="{% url 'main_menu' %}">Main Menu</a></li>
+        <li><a href="{% url 'mosaic:upload_new' %}">Upload Images</a></li>
+        <li><a href="{% url 'remove' %}">Remove Images</a></li>
+      </ul>
+    </nav>
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- jQuery & Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

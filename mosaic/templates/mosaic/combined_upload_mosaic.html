@@ -1,0 +1,225 @@
+{# 
+combined_upload_mosaic.html
+
+PURPOSE:
+    Provides a unified interface for users to upload multiple images asynchronously and configure mosaic creation options on the same page.
+
+HOW IT WORKS:
+    - Uses jQuery File Upload plugin to handle multiple file uploads with progress bars, preview thumbnails, and delete options.
+    - Keeps track of uploaded image IDs returned by the AJAX upload API.
+    - Presents mosaic configuration options: tile shape, quality, artistic effect, transparency, and output filename.
+    - When the user submits the mosaic form, the selected image IDs and options are sent via AJAX POST to trigger the mosaic creation Celery task.
+    - Shows status messages and disables the submit button during processing.
+
+INTERACTIONS:
+    - Uploads use `PictureCreateView` AJAX endpoint to upload images.
+    - Mosaic creation POST request hits the combined upload+mosaic view (e.g., `combined_upload_mosaic` view).
+    - Expects JSON responses from upload API with uploaded image info.
+    - Requires static files: jQuery, jQuery UI, Bootstrap CSS/JS, jQuery File Upload plugin files.
+    - Backend saves files to MEDIA_ROOT and stores Picture records.
+#}
+
+{% extends 'base.html' %}
+{% load upload_tags %}
+
+{% block title %}Photomosaic Test{% endblock %}
+
+{% block content %}
+<h2>Step 1: Upload Images</h2>
+
+<!-- Main Image Upload -->
+<div style="margin-bottom: 2em;">
+  <strong>Main Image (Centerpiece for Mosaic):</strong><br>
+  <input type="file" id="main-imgfile" accept="image/*" required>
+  <span id="main-imgfile-label"></span>
+  <input type="hidden" id="main-imgfile-hidden" name="main_imgfile_id" value="" />
+</div>
+
+<!-- Pool Images Upload (Blueimp) -->
+<div style="margin-bottom: 2em;">
+  <strong>Pool Images (Tiles for Mosaic):</strong><br>
+  <form id="fileupload" method="post" enctype="multipart/form-data" action="{% url 'mosaic:upload_new' %}">
+    {% csrf_token %}
+    <span class="btn btn-success fileinput-button">
+      <span>Add files...</span>
+      <input type="file" name="file" multiple>
+    </span>
+    <span class="btn btn-primary" id="upload-files-btn" style="cursor:pointer;">
+      <span>Upload Files</span>
+    </span>
+    <button type="reset" class="btn btn-warning cancel">Cancel upload</button>
+    <button type="button" class="btn btn-danger delete">Delete</button>
+    <div class="fileupload-progress fade">
+      <div class="progress progress-striped active">
+        <div class="progress-bar progress-bar-success" style="width:0%;"></div>
+      </div>
+    </div>
+    <table role="presentation" class="table table-striped"><tbody class="files"></tbody></table>
+    <div id="pool-thumbnails" style="margin-top:1em;"></div>
+    <p><strong>Notes:</strong> You can drag & drop files for upload.</p>
+  </form>
+</div>
+
+<!-- Blueimp Gallery widget for carousel previews -->
+<div id="blueimp-gallery" class="blueimp-gallery blueimp-gallery-controls" tabindex="-1" aria-modal="true" role="dialog">
+    <div class="slides"></div>
+    <h3 class="title"></h3>
+    <a class="prev">‹</a>
+    <a class="next">›</a>
+    <a class="close">×</a>
+    <a class="play-pause"></a>
+    <ol class="indicator"></ol>
+</div>
+
+<hr>
+
+<h2>Step 2: Configure Mosaic & Create</h2>
+<form id="mosaic-form" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" id="uploaded_image_ids" name="uploaded_image_ids" value="" />
+  <input type="hidden" id="main-imgfile-hidden-final" name="main_imgfile_id" value="" />
+  <div>
+    <strong>Tile Shape:</strong><br>
+    <label><input type="radio" name="shape" value="square" required> Square/Rectangle</label>
+    <label><input type="radio" name="shape" value="hexagons"> Hexagons</label>
+    <label><input type="radio" name="shape" value="puzzle"> Puzzle</label>
+  </div>
+  <div>
+    <strong>Mosaic Quality:</strong><br>
+    <label><input type="radio" name="quality" value="low" required> Mosaic with low quality</label>
+    <label><input type="radio" name="quality" value="med"> Mosaic with medium quality</label>
+    <label><input type="radio" name="quality" value="high"> Mosaic with high quality</label>
+  </div>
+  <div>
+    <label><input type="checkbox" name="artistic_effect"> Enable artistic tiling effect (advanced)</label>
+  </div>
+  <div>
+    <label>Transparency (0–100, optional):</label>
+    <input type="number" name="fading" min="0" max="100" step="1">
+    <span style="font-size: 0.95em;">Controls blending with the original. 0 = no fade, 100 = fully mosaic only.</span>
+  </div>
+  <div>
+    <label>Output image filename (e.g., mosaic.jpg):</label>
+    <input type="text" name="outfile" placeholder="mosaic.jpg">
+    <span style="font-size: 0.95em;">You can use .jpg, .png, etc.</span>
+  </div>
+  <button type="submit" id="create-mosaic-btn" class="btn btn-success" disabled>
+    Create Mosaic
+  </button>
+</form>
+
+{% upload_js %}
+{% endblock %}
+
+{% block extra_js %}
+<!-- === SCRIPT ORDER IS CRITICAL! === -->
+<script src="/static/js/jquery-3.6.0.min.js"></script>
+<script src="/static/js/jquery.iframe-transport.js"></script>
+<script src="/static/js/jquery.blueimp-gallery.min.js"></script>
+<script src="/static/js/main.js"></script>
+<!-- ================================ -->
+
+<script>
+$(function(){
+    // === State holders ===
+    var uploadedImageIDs = [];
+    var mainImageID = "";
+
+    // --- Main Image Upload (AJAX) ---
+    $('#main-imgfile').on('change', function(e){
+      var file = e.target.files[0];
+      if (file) {
+        $('#main-imgfile-label').text('Selected: ' + file.name);
+        var formData = new FormData();
+        formData.append('file', file);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        fetch("{% url 'mosaic:upload_new' %}", {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.files && data.files.length > 0 && data.files[0].id) {
+            mainImageID = data.files[0].id;
+            $('#main-imgfile-hidden').val(mainImageID);
+            $('#main-imgfile-hidden-final').val(mainImageID);
+            updateCreateMosaicButton();
+          }
+        });
+      } else {
+        $('#main-imgfile-label').text('');
+        mainImageID = "";
+        $('#main-imgfile-hidden').val("");
+        $('#main-imgfile-hidden-final').val("");
+        updateCreateMosaicButton();
+      }
+    });
+
+    // --- Pool Images Upload (Blueimp) ---
+    $('#fileupload').fileupload({
+        url: "{% url 'mosaic:upload_new' %}",
+        dataType: 'json',
+        autoUpload: false,
+        acceptFileTypes: /(\.|\/)(gif|jpe?g|png)$/i,
+        done: function (e, data) {
+            if (data.result && data.result.files) {
+                for (var i = 0; i < data.result.files.length; i++) {
+                    var file = data.result.files[i];
+                    if (file.id) {
+                        uploadedImageIDs.push(file.id);
+                    }
+                    // Show thumbnail if available
+                    var thumbUrl = file.thumbnailUrl || file.url;
+                    if (thumbUrl) {
+                        var thumb = $('<a>')
+                            .attr('href', thumbUrl)
+                            .attr('data-gallery', '')
+                            .append(
+                                $('<img>')
+                                    .attr('src', thumbUrl)
+                                    .addClass('img-thumbnail')
+                                    .css({'height': '64px', 'margin': '4px'})
+                            );
+                        $('#pool-thumbnails').append(thumb);
+                    }
+                }
+                $('#uploaded_image_ids').val(uploadedImageIDs.join(','));
+                updateCreateMosaicButton();
+            }
+        }
+    });
+
+    // Manual Upload Files button
+    $('#upload-files-btn').on('click', function() {
+        var files = $('#fileupload input[type="file"]')[0].files;
+        if (!files.length) {
+            alert("Please select pool images before uploading.");
+            return;
+        }
+        $('#fileupload').fileupload('send', {
+            files: files,
+            formData: {'csrfmiddlewaretoken': '{{ csrf_token }}'}
+        });
+    });
+
+    // Enable mosaic button only if both main and pool images uploaded
+    function updateCreateMosaicButton() {
+      var mainImgSelected = !!$('#main-imgfile-hidden').val();
+      var poolImagesUploaded = uploadedImageIDs.length > 0;
+      $('#create-mosaic-btn').prop('disabled', !(mainImgSelected && poolImagesUploaded));
+    }
+
+    // Update hidden fields just before form submit
+    $('#mosaic-form').on('submit', function(e){
+      $('#uploaded_image_ids').val(uploadedImageIDs.join(','));
+      $('#main-imgfile-hidden-final').val(mainImageID);
+      // DEBUG
+      //console.log("Form submitted! Main image ID:", mainImageID, "Pool IDs:", uploadedImageIDs);
+    });
+
+    // Initial button state
+    updateCreateMosaicButton();
+});
+</script>
+{% endblock %}

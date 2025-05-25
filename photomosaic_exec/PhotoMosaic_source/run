@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -x
+CWD="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+PHOTO_EXEC_PATH=${CWD}'/../photomosaic_exec/'
+echo '###### Create Cython modules'
+export PYTHONPATH=$CURRENT_PATH
+mkdir -p ${PHOTO_EXEC_PATH}
+python setup.py build_ext --inplace
+python setup.py clean
+mv *.so ${PHOTO_EXEC_PATH}
+touch ${PHOTO_EXEC_PATH}__init__.py
+echo ###### Cleaning auxiliary files
+rm -f *.c *.pyc *.dll color_metrics/color_metrics.c
+echo '###### Finished'

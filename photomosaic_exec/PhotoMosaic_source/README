@@ -1,0 +1,165 @@
+ACTUAL NEEDED FOR COMPILATION
+
+Cython==0.20.1
+Pillow==2.4.0
+argparse==1.2.1
+billiard==3.3.0.17
+kombu==3.0.15
+nose==1.3.1
+numpy==1.8.1
+pgmagick==0.5.7
+pymongo==2.7
+pytz==2014.2
+
+DEPENDENCIES SPECIFIED BY AUTHOR
+
+Numpy >= 1.7.1_0
+Scipy >= 0.12.0_2
+PIL (Python Image Library) >= 1.1.7_6
+ImageMagick >= 5.14._1
+PythonMagick >= 0.9.8
+Mongodb >= 2.4.5_0
+pymongo >= 2.5.2_0
+
+
+
+
+COMPILATION
+
+Execute the 'run' script in a console
+
+$ ./run
+
+This will compile and generate a folder called photomosaic_exec, inside this
+folder are all the modules to run the program
+
+BASIC USAGE
+
+$ import photomosaic_exec as pm
+
+$ impool = pm.ImagePool('folder-of-many-images/', 'photomosaic')
+$ impool.pool()
+$ mypm = pm.PhotoMosaic('path-to-original-image/original.jpg', (50, 50), 'shape')
+$ mypm.partition()
+$ mypm.analyze()
+$ mypm.choose_match('photomosaic')
+$ mypm.mosaic()
+$ mypm.fading()
+$ mypm.imsave('mosaic.jpg')
+
+Remarks on each step:
+
+* Generating an image pool of  10000 images takes about 220 [s] and has to be
+  done only once, and additional images can be added later without redoing
+  the whole thing. Just run it again on a new folder or on the same folder
+  with news images; it will skip duplicates. (This method is executed
+  concurrently and is speed up according to the number of cores/threads of
+  the host computer.)
+
+* Creating a Photomosaic object takes no time at all, it only initialize the
+  conditions on which the mosaic will be created. The parameters are the path
+  to the original images, (10,10) indicates the number of tiles along each
+  dimension (width, height). 'shape' indicates the shape of the tiles,
+  available options are 'square', for square/rectangular shapes, 'hex' for
+  hexagonal shapes and 'puzzle' for jigsaw shapes.
+
+* Partitioning the images into tiles.
+
+* Analyzing tiles (computing rgb and lab colors) takes about 40 [s] for 2500
+  tiles.
+
+* Choosing the matching images is by far the longest step, because it needs
+  to compute a distance matrix, which it generating by comparing each tile
+  with every image in the database to find the best possible match. (This
+  method is executed concurrently and is speed up according to the number of
+  cores/threads of the host computer.)
+
+* Placing tiles and make the shape desired.
+
+* Bending help to improve the image quality using alpha compositing.
+
+* Save image with specified name. To see supported format go to
+  http://www.imagemagick.org/script/formats.php
+
+
+ADVANCED USAGE
+
+For creating an artistic effect, one can allow tiles to split recursively.
+
+$ mypm.partition(depth=2)
+
+'depth' limits how tile-splitting can go, but it does not control how many
+tiles will decide to split. The greater the depth, the greater partitioning
+of sub-tiles.
+
+Photomosaics with curved edges (masked images):
+
+Create a black and white image of the same size of your target image. White
+areas will be kept, and black areas will be masked. Pass it to partition.
+
+mypm.partition(mask=mask_img)
+
+Tiles that fall wholly in the black area of the mask will be left blank. Of
+course, a curved edge is better traced by tiles that are small. When you
+invoke multiscale tiling along with the mask, small tiles will fill in along
+the edge. This mask can also be used to ignore certain parts of the images
+that one want to be ignored during tiling, for example faces.
+
+Choosing matching images:
+
+By default the 'euclidean metric' and the RGB color space are used to find
+the closest match image, but it is also allowed to use CieLab color space and
+the deltaE2000 metric to find image matches to used this values, pass it to
+choose_images
+
+$ mypm.choose_match('photomosaic', color_space='lab', metric='deltaE2000')
+
+Assembling Tiles
+
+By default the output image is four times greater than the input image. To
+change this value pass it to 'mosaic'
+
+$ mypm.mosaic(factor=2)
+
+Alpha compositing (Bending):
+
+Default value for alpha compositing value is 0.85, to specified other value
+pass it to 'fading'.
+
+$ mypm.fading(0.7)
+
+allowed values are between 0 and 1.0
+
+Tile matching and repetition:
+
+By the default each image is used only once, in case the number of tiles is
+greater than the number of images in the database, repetition is allow in
+such a way that the repetition is minimum.
+
+
+FUTURE WORK
+
+All the steps on the photomosaic are computed relatively fast but the
+choosing matches step. Because it requires to do a large number of
+comparisons, between each tile and the database image. This process seems
+that can be computed in parallel but needs to work with a concurrent
+database. In this step the data of the database is loaded in local variables
+to do the processing, to accelerate the process it will be also convenient to
+do this processing on the database that support Map-Reduce operations.
+
+*** September 21, 2013
+
+The image database and choose_match step are now computed concurrently and
+the mosaic generation is speed up according to the number of cores/threads of
+the host computer. The next step to increase speel will be to use GPU's.
+
+REMARKS
+
+As the process to generate the mosaic takes a lot of resources, it will be
+convenient to used two servers, one which serves the web page an another
+which serves the mosaic applications in this way one can balance the load
+in the computer. When using the app in production it's convenient to
+check how many mosaics can be generated without overloading the sever and
+make it unresponsive, in the case of the test server a Pentium D @ 3GHz and
+2GB of RAM this bound is of 5 process at the same time. In production one
+can limit the number of task such that the server doesn't become unresponsive.

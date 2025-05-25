@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Mosaic{% endblock %}
+
+{% block extra_head %}
+<style>
+  #pool-thumbnails {
+    max-height: 100px;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-bottom: 1em;
+  }
+  #pool-thumbnails .tile-thumb {
+    height: 64px;
+    margin: 4px;
+    display: inline-block;
+  }
+  #upload-tiles-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>Step 1: Upload Images</h2>
+<div style="margin-bottom:1em;">
+  <strong>Main Image (Centerpiece):</strong><br>
+  <input type="file" id="main-imgfile" accept="image/*">
+  <span id="main-imgfile-label"></span>
+  <input type="hidden" id="main-imgfile-hidden" name="main_imgfile_id" value="">
+</div>
+
+<div style="margin-bottom:1em;">
+  <strong>Pool Images (Tiles):</strong><br>
+  <input type="file" id="tile-files" multiple>
+  <button type="button" id="upload-tiles-btn" disabled>Upload Tiles</button>
+  <div id="pool-thumbnails"></div>
+  <p><strong>Notes:</strong> Select multiple files then click “Upload Tiles.”</p>
+</div>
+
+<hr/>
+
+<h2>Step 2: Configure Mosaic & Create</h2>
+<form id="mosaic-form" method="POST" action="{% url 'mosaic:home' %}">
+  {% csrf_token %}
+  <input type="hidden" id="uploaded_image_ids" name="uploaded_image_ids" value="">
+  <input type="hidden" id="main-imgfile-hidden"    name="main_imgfile_id"    value="">
+
+  <div>
+    <strong>Tile Shape:</strong><br>
+    <label><input type="radio" name="shape" value="square" required> Square</label>
+    <label><input type="radio" name="shape" value="hexagons"> Hexagons</label>
+    <label><input type="radio" name="shape" value="puzzle"> Puzzle</label>
+  </div>
+  <div>
+    <strong>Mosaic Quality:</strong><br>
+    <label><input type="radio" name="quality" value="low" required> Low</label>
+    <label><input type="radio" name="quality" value="med"> Medium</label>
+    <label><input type="radio" name="quality" value="high"> High</label>
+  </div>
+  <div>
+    <label><input type="checkbox" name="artistic_effect"> Artistic effect</label>
+  </div>
+  <div>
+    <label>Transparency (0–100):</label>
+    <input type="number" name="fading" min="0" max="100" step="1">
+  </div>
+  <div>
+    <label>Output filename:</label>
+    <input type="text" name="outfile" placeholder="mosaic.jpg">
+  </div>
+  <button type="submit" id="create-mosaic-btn" class="btn btn-success" disabled>
+    Create Mosaic
+  </button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let uploadedImageIDs = [];
+  let mainImageID = "";
+
+  // 1) Main image AJAX upload
+  $('#main-imgfile').on('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $('#main-imgfile-label').text('Selected: ' + file.name);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    fetch("{% url 'mosaic:upload_new' %}", {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    })
+    .then(r => r.json())
+    .then(data => {
+      mainImageID = data.files[0].id;
+      $('#main-imgfile-hidden').val(mainImageID);
+      updateCreateMosaicButton();
+    });
+  });
+
+  // 2) Enable the Upload Tiles button as soon as files are selected
+  $('#tile-files').on('change', function() {
+    $('#upload-tiles-btn').prop('disabled', this.files.length === 0);
+  });
+
+  // 3) Batch‐upload all selected tile files
+  $('#upload-tiles-btn').on('click', function() {
+    const input = document.getElementById('tile-files');
+    if (!input.files.length) return;
+    const fd = new FormData();
+    for (const f of input.files) {
+      fd.append('file', f);
+    }
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    fetch("{% url 'mosaic:upload_new' %}", {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    })
+    .then(r => r.json())
+    .then(data => {
+      data.files.forEach(f => {
+        uploadedImageIDs.push(f.id);
+        $('#pool-thumbnails')
+          .append(
+            `<img src="${f.thumbnailUrl||f.url}" class="tile-thumb img-thumbnail">`
+          );
+      });
+      $('#uploaded_image_ids').val(uploadedImageIDs.join(','));
+      updateCreateMosaicButton();
+      // clear the file input so user can re‐select if needed
+      input.value = "";
+      $(this).prop('disabled', true);
+    });
+  });
+
+  // 4) Enable the Create Mosaic button only when we have both IDs
+  function updateCreateMosaicButton() {
+    const okMain = !!mainImageID;
+    const okPool = uploadedImageIDs.length > 0;
+    $('#create-mosaic-btn').prop('disabled', !(okMain && okPool));
+  }
+
+  // 5) Re-set hidden fields just before submission
+  $('#mosaic-form').on('submit', function() {
+    $('#uploaded_image_ids').val(uploadedImageIDs.join(','));
+    $('#main-imgfile-hidden').val(mainImageID);
+  });
+
+  // init
+  updateCreateMosaicButton();
+</script>
+{% endblock %}

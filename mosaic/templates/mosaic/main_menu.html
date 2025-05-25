@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Main Menu{% endblock %}
+
+{% block content %}
+  <h1>Photomosaic Main Menu</h1>
+  <ul class="list-unstyled">
+    <li>
+      <strong>Upload Images:</strong>
+      <a href="{% url 'mosaic:upload_new' %}" class="btn btn-primary">Upload</a>
+    </li>
+    <li>
+      <strong>Create Mosaic:</strong>
+      <a href="{% url 'home' %}" class="btn btn-success">Create</a>
+    </li>
+    <li>
+      <strong>Remove Images:</strong>
+      <a href="{% url 'remove' %}" class="btn btn-danger">Remove All</a>
+    </li>
+  </ul>
+{% endblock %}

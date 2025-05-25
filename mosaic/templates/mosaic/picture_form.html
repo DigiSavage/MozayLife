@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load upload_tags %}
+
+{% block title %}Photomosaic Test{% endblock %}
+
+{% block content %}
+  <h2>Image Upload</h2>
+
+  <p>Basic image upload</p>
+
+  <p>File Upload widget with multiple file selection<br>
+     Supports cross-domain, chunked, and resumable file uploads</p>
+
+  <form id="fileupload" method="post" enctype="multipart/form-data" action="">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <div class="fileupload-buttons">
+      <span class="btn btn-success fileinput-button">
+        <span>Add files...</span>
+        <input type="file" name="files[]" multiple>
+      </span>
+      <button type="submit" class="btn btn-primary start">
+        <i class="glyphicon glyphicon-upload"></i>
+        <span>Start upload</span>
+      </button>
+      <button type="reset" class="btn btn-warning cancel">
+        <i class="glyphicon glyphicon-ban-circle"></i>
+        <span>Cancel upload</span>
+      </button>
+      <button type="button" class="btn btn-danger delete">
+        <i class="glyphicon glyphicon-trash"></i>
+        <span>Delete</span>
+      </button>
+    </div>
+
+    <div class="fileupload-progress fade">
+      <div class="progress progress-striped active" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-bar progress-bar-success" style="width:0%;"></div>
+      </div>
+    </div>
+
+    <table role="presentation" class="table table-striped"><tbody class="files"></tbody></table>
+  </form>
+
+  <div>
+    <strong>Notes:</strong>
+    <ul>
+      <li>You can drag & drop files for upload</li>
+    </ul>
+  </div>
+
+  <!-- Upload Template -->
+  <script id="template-upload" type="text/x-tmpl">
+  {% verbatim %}
+  {% for (var i=0, file; file=o.files[i]; i++) { %}
+    <tr class="template-upload fade">
+      <td><span class="preview"></span></td>
+      <td>
+        <p class="name">{%=file.name%}</p>
+        {% if (file.error) { %}
+          <div><span class="label label-important">{%=locale.fileupload.error%}</span> {%=file.error%}</div>
+        {% } %}
+      </td>
+      <td>
+        <p class="size">{%=o.formatFileSize(file.size)%}</p>
+        {% if (!o.files.error) { %}
+          <div class="progress progress-striped active" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress-bar progress-bar-success" style="width:0%;"></div>
+          </div>
+        {% } %}
+      </td>
+      <td>
+        {% if (!i) { %}
+          <button class="btn btn-primary start" disabled>
+            <i class="glyphicon glyphicon-upload"></i>
+            {%=locale.fileupload.start%}
+          </button>
+        {% } %}
+        {% if (!i) { %}
+          <button class="btn btn-warning cancel">
+            <i class="glyphicon glyphicon-ban-circle"></i>
+            {%=locale.fileupload.cancel%}
+          </button>
+        {% } %}
+      </td>
+    </tr>
+  {% } %}
+  {% endverbatim %}
+  </script>
+
+  <!-- Download Template -->
+  <script id="template-download" type="text/x-tmpl">
+  {% verbatim %}
+  {% for (var i=0, file; file=o.files[i]; i++) { %}
+    <tr class="template-download fade">
+      <td><span class="preview">
+        {% if (file.thumbnailUrl) { %}
+          <a href="{%=file.url%}" title="{%=file.name%}" download="{%=file.name%}" data-gallery><img src="{%=file.thumbnailUrl%}"></a>
+        {% } %}
+      </span></td>
+      <td>
+        <p class="name">
+          <a href="{%=file.url%}" title="{%=file.name%}" download="{%=file.name%}" {%=file.thumbnailUrl?'data-gallery':''%}>{%=file.name%}</a>
+        </p>
+        {% if (file.error) { %}
+          <div><span class="label label-important">{%=locale.fileupload.error%}</span> {%=file.error%}</div>
+        {% } %}
+      </td>
+      <td><span class="size">{%=o.formatFileSize(file.size)%}</span></td>
+      <td>
+        <button class="btn btn-danger delete" data-type="{%=file.deleteType%}" data-url="{%=file.deleteUrl%}"{% if (file.deleteWithCredentials) { %} data-xhr-fields='{"withCredentials":true}'{% } %}>
+          <i class="glyphicon glyphicon-trash"></i>
+          <span>{%=locale.fileupload.destroy%}</span>
+        </button>
+        <input type="checkbox" name="delete" value="1" class="toggle">
+      </td>
+    </tr>
+  {% } %}
+  {% endverbatim %}
+  </script>
+
+  {% upload_js %}
+{% endblock %}

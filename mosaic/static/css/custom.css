@@ -1,0 +1,14 @@
+/* custom.css */
+
+/* Make mosaic upload buttons stand out */
+.btn-upload {
+    background-color: #007bff;
+    color: #fff;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+/* Override Bootstrap or plugin CSS if needed */
+.thumbnail {
+    border: 3px solid #1abc9c;
+}

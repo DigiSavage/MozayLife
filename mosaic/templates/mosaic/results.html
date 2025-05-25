@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Mozay Test{% endblock %}
+{% block extra-head %}
+<style>
+/* Simple spinner CSS */
+.mozay-spinner {
+  margin: 24px auto 12px auto;
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #008cba;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  animation: mozay-spin 1s linear infinite;
+}
+@keyframes mozay-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+  {% if not im %}
+    <h1>Computing Mozay</h1>
+    <div class="mozay-spinner"></div>
+    <p>Your Mozay is being generated. Please wait...</p>
+    <p><em>This page will auto-refresh every 7 seconds.</em></p>
+    <a href="{% url 'mosaic:home' %}" class="btn btn-secondary" style="margin-top:18px;">Back to Home</a>
+    <script>
+      setTimeout(function() {
+        window.location.reload();
+      }, 7000);
+    </script>
+  {% elif error == None %}
+    <h1>Mozay Generated</h1>
+    <p>It took {{ total_time }} seconds to complete.</p>
+    {% if s3_url %}
+      <h2>Your Mozay is Ready!</h2>
+      <a href="{{ s3_url }}" target="_blank" class="btn btn-primary">View Full Image</a>
+      <div style="margin-top:20px;">
+        <img src="{{ s3_url }}" style="max-width:100%; height:auto;" alt="Generated Mozay"/>
+      </div>
+    {% else %}
+      <p>Could not find the output image. Please try again.</p>
+    {% endif %}
+    <a href="{% url 'mosaic:home' %}" class="btn btn-secondary" style="margin-top:22px;">Back to Home</a>
+  {% else %}
+    <h1 style="color:red;">Error Occurred</h1>
+    <p>{{ error }}</p>
+    <a href="{% url 'mosaic:home' %}" class="btn btn-secondary" style="margin-top:22px;">Back to Home</a>
+  {% endif %}
+
+{% endblock %}
